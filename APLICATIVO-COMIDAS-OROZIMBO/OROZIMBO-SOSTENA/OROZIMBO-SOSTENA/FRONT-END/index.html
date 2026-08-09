@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Estoque Escolar - Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    
+
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <label for="upload-foto" class="avatar-upload">
+                <div class="user-avatar" id="avatar-img"><i class="fas fa-user"></i></div>
+                <div class="avatar-badge"><i class="fas fa-camera"></i></div>
+                <input type="file" id="upload-foto" hidden accept="image/*" onchange="trocarFotoPerfil(event)">
+            </label>
+            <div class="user-info">
+                <span id="profile-name">Usuário</span>
+                <small id="profile-role">Cargo</small>
+            </div>
+            <button class="close-btn" onclick="toggleMenu()">&times;</button>
+        </div>
+        
+        <nav class="sidebar-menu">
+            <div class="menu-section">Painel de Controle</div>
+            <div class="setting-item">
+                <span><i class="fas fa-sun"></i> Brilho</span>
+                <input type="range" min="30" max="100" value="100" oninput="ajustarBrilho(this.value)">
+            </div>
+            
+            <div class="menu-divider"></div>
+            
+            <a href="#" onclick="alert('Suporte técnico: suporte@escola.com')"><i class="fas fa-question-circle"></i> Ajuda</a>
+            <a href="#" onclick="logout()" class="link-danger"><i class="fas fa-sign-out-alt"></i> Sair do Sistema</a>
+        </nav>
+    </div>
+
+    <button id="menu-toggle" class="menu-toggle hidden" onclick="toggleMenu()"><i class="fas fa-bars"></i></button>
+
+    <div id="login-view" class="box">
+        <header>
+            <div class="hero-icon"><i class="fas fa-school"></i></div>
+            <h2>Acesso ao Sistema</h2>
+            <p>Selecione uma opção abaixo</p>
+        </header>
+
+        <div class="tab-switcher">
+            <button id="tab-login" class="tab-btn active" onclick="mudarAba('login')">Entrar</button>
+            <button id="tab-cadastro" class="tab-btn" onclick="mudarAba('cadastro')">Criar Conta</button>
+        </div>
+        
+        <div id="form-login" class="form-group">
+            <label>Seu CPF:</label>
+            <input type="text" id="login-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascararCPF(this)">
+            <div class="info-card">
+                <label class="info-card-label"><i class="fas fa-key"></i> Token de Segurança:</label>
+                <input type="password" id="login-token" placeholder="Código do cargo">
+                <small class="field-hint">Tokens: Cozinheira = <strong>COZ-2026-SCHOOL</strong>, Diretor = <strong>DIR-2026-MASTER</strong></small>
+            </div>
+            <button id="btn-login" class="button button--primary mt-20" onclick="executarLogin()">Acessar Sistema</button>
+        </div>
+
+        <div id="form-cadastro" class="form-group hidden">
+            <label>Seu Cargo:</label>
+            <select id="reg-cargo">
+                <option value="Cozinheira">Cozinheira (A)</option>
+                <option value="Diretor">Diretor (A)</option>
+            </select>
+            <div class="input-row">
+                <input type="text" id="reg-nome" placeholder="Nome">
+                <input type="text" id="reg-sobrenome" placeholder="Sobrenome">
+            </div>
+            <input type="email" id="reg-email" placeholder="E-mail profissional">
+            <input type="text" id="reg-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascararCPF(this)">
+            <div class="terms-container">
+                <input type="checkbox" id="reg-termos">
+                <label for="reg-termos">Concordo com as normas da instituição</label>
+            </div>
+            <button onclick="executarCadastro()" class="button button--success mt-15">Finalizar Cadastro</button>
+        </div>
+    </div>
+
+    <div id="cozinha-view" class="box hidden">
+        <header>
+            <h2><i class="fas fa-utensils"></i> REGISTRO DE REFEIÇÃO</h2>
+            <p>Responsável: <b id="user-display"></b></p>
+        </header>
+        <div class="form-group">
+            <label>Período:</label>
+            <select id="periodo-refeicao">
+                <option value="Café da Manhã">Café da Manhã</option>
+                <option value="Almoço">Almoço</option>
+                <option value="Café da Tarde">Café da Tarde</option>
+                <option value="Janta">Janta</option>
+            </select>
+
+            <label>O que será servido?</label>
+            <input type="text" id="prato-dia" placeholder="Ex: Galinhada com Salada">
+
+            <div class="panel panel-soft mt-15">
+                <label>Ingrediente (Selecione o Lote):</label>
+                <input type="text" id="busca-cozinha" class="input-search" placeholder="Buscar alimento..." oninput="filtrarSelectCozinha()">
+                <select id="alimento" onchange="mostrarInfoExtra()"></select>
+                <p class="field-hint">Disponível: <span id="display-atual" class="text-strong">-</span></p>
+                
+                <div class="grid-columns">
+                    <div>
+                        <label class="small-label">Qtd Unidades (Pacotes/Caixas):</label>
+                        <input type="number" id="qtd-unidades-saida" placeholder="Ex: 2" oninput="calcularPesoAutomatico()">
+                    </div>
+                    <div>
+                        <label class="small-label">Peso total (Kg):</label>
+                        <input type="number" id="qtd" placeholder="Peso total" step="0.001">
+                    </div>
+                </div>
+                
+                <button onclick="adicionarItemNaLista()" class="button button--primary mt-10">Adicionar à Baixa</button>
+            </div>
+
+            <div class="panel panel-card mt-20">
+                <p class="section-title"><i class="fas fa-list"></i> Itens para Saída:</p>
+                <ul id="lista-temporaria-itens" class="item-summary"></ul>
+            </div>
+
+            <button onclick="enviarBaixaCompleta()" class="button button--success mt-20">
+                <i class="fas fa-check-circle"></i> Confirmar Saída de Estoque
+            </button>
+        </div>
+    </div>
+
+    <div id="diretor-view" class="box hidden">
+        <header class="dashboard-header">
+            <div>
+                <h2><i class="fas fa-chart-line"></i> PAINEL DO DIRETOR</h2>
+                <p>Olá, <span id="admin-display" class="text-highlight"></span></p>
+            </div>
+            <div id="data-atual" class="badge"></div>
+        </header>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="abrirAbaDiretor(event, 'aba-historico')">Histórico</button>
+            <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-pratos')">Pratos do Dia</button>
+            <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-conferencia')">Conferir</button>
+            <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-estoque')">Gerenciar</button>
+        </div>
+
+        <div id="aba-historico" class="tab-content">
+            <div class="action-row">
+                <button onclick="carregarListasFluxo()" class="button button--primary">Recarregar</button>
+                <button onclick="limparTodoOHistorico()" class="button button--danger"><i class="fas fa-trash"></i> Limpar Tudo</button>
+            </div>
+            <h3 class="section-title">Entrada e Saída de Comida</h3>
+            <div class="monitor-fluxo">
+                <div class="fluxo-card">
+                    <h3 class="card-title"><i class="fas fa-arrow-circle-down text-success"></i> ENTRADA</h3>
+                    <div id="lista-fluxo-entradas"></div>
+                    <button onclick="limparFluxoEntrada()" class="button button--secondary mt-12">Limpar Entradas</button>
+                </div>
+                <div class="fluxo-card">
+                    <h3 class="card-title"><i class="fas fa-arrow-circle-up text-danger"></i> SAÍDA</h3>
+                    <div id="lista-fluxo-saidas"></div>
+                    <button onclick="limparFluxoSaida()" class="button button--secondary mt-12">Limpar Saídas</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="aba-pratos" class="tab-content hidden">
+            <div class="action-row">
+                <button onclick="verGastoDoDia()" class="button button--primary">Recarregar histórico</button>
+            </div>
+            <h2 class="section-heading">Pratos do Dia - Consumo Detalhado</h2>
+            <div id="lista-dia" class="historico-list"></div>
+        </div>
+
+        <div id="aba-conferencia" class="tab-content hidden">
+            <div class="action-row">
+                <input type="text" id="busca-estoque" placeholder="Pesquisar alimento..." oninput="carregarTabelaConferencia()">
+                <button onclick="document.getElementById('input-excel').click()" class="button button--primary button--compact">
+                    <i class="fas fa-file-excel"></i> Importar SED (Excel)
+                </button>
+                <input type="file" id="input-excel" hidden accept=".xlsx, .xls" onchange="processarExcel(event)">
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Lote</th>
+                            <th>Unidades</th>
+                            <th>Peso (kg)</th>
+                            <th>Validade</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabela-estoque"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="aba-estoque" class="tab-content hidden">
+            <div class="grid-two-columns">
+                <div class="panel panel-soft">
+                    <h4 class="panel-title"><i class="fas fa-plus-circle"></i> Nova Entrada Manual</h4>
+                    <input type="text" id="add-nome" placeholder="Nome do Produto (Ex: Arroz)">
+                    <input type="text" id="add-lote" placeholder="Número do Lote">
+                    
+                    <div class="input-row">
+                        <input type="number" id="add-unidades" placeholder="Qtd Unidades">
+                        <input type="number" id="add-qtd" placeholder="Peso Total (kg)" step="0.001">
+                    </div>
+                    
+                    <label class="small-label">Data de Validade:</label>
+                    <input type="date" id="add-validade">
+                    
+                    <button onclick="adicionarNovoEstoque()" class="button button--success mt-10">Salvar no Estoque</button>
+                </div>
+                
+                <div class="panel panel-alert">
+                    <h4 class="panel-title"><i class="fas fa-trash-alt"></i> Remoção Rápida</h4>
+                    <p class="field-hint">Selecione o lote para remover permanentemente:</p>
+                    <select id="delete-alimento-select" class="mb-15"></select>
+                    <button onclick="removerItemEstoque()" class="button button--danger">Excluir do Sistema</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
