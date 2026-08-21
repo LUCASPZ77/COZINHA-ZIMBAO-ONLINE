@@ -636,3 +636,28 @@ table tr:hover {
         flex: 1 1 40%; /* Permite que os botões quebrem linha se necessário */
     }
 }
+
+/* --- TELA DE CARREGAMENTO --- */
+#loading {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+#loading-logo {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(2,6,23,0.12);
+    animation: pulse 1.6s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+    100% { transform: scale(1); }
+}

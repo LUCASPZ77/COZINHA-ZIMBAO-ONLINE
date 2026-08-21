@@ -24,6 +24,30 @@ app.use(express.json());
 app.use(cors());
 app.use(requestLogger);
 
+// Serve assets que estão fora da pasta FRONT-END (ex: imagem colocada na raiz do workspace)
+app.use('/external-assets', express.static(join(__dirname, '..', '..', '..', '..')));
+
+// Rota dedicada para servir o logo (garante headers corretos e caminho curto)
+import fs from 'fs';
+
+app.get('/logo.jpg', (req, res) => {
+  // Preferir logo na pasta FRONT-END (caso o usuário tenha colocado o arquivo lá)
+  const frontLogo = join(pastaFrontEnd, 'logo.jpg');
+  if (fs.existsSync(frontLogo)) {
+    return res.sendFile(frontLogo);
+  }
+
+  // Fallback: procurar logo na raiz do workspace (vários níveis acima)
+  const fallback = join(__dirname, '..', '..', '..', '..', 'logo.jpg');
+  if (fs.existsSync(fallback)) return res.sendFile(fallback);
+
+  // último recurso: procurar pelo arquivo com outro nome conhecido
+  const alt = join(__dirname, '..', '..', '..', '..', 'Gemini_Generated_Image_vqu4njvqu4njvqu4.jpg');
+  if (fs.existsSync(alt)) return res.sendFile(alt);
+
+  res.status(404).send('Logo not found');
+});
+
 // Cria tabelas se necessário (idempotente)
 try {
   createUserTable();

@@ -1,4 +1,38 @@
 const API_URL = 'http://localhost:3000';
+// Esconde a tela de carregamento (mostra por pelo menos 600ms para evitar flash)
+function hideLoadingOverlay(minimumMs = 600) {
+    const el = document.getElementById('loading');
+    if (!el) return;
+    const alreadyShown = el.dataset.shownAt ? Number(el.dataset.shownAt) : Date.now();
+    const wait = Math.max(0, minimumMs - (Date.now() - alreadyShown));
+    const doHide = () => setTimeout(() => {
+        el.style.transition = 'opacity 0.3s ease';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 350);
+    }, wait);
+
+    const img = document.getElementById('loading-logo');
+    if (img) {
+        if (img.complete && img.naturalWidth !== 0) {
+            doHide();
+        } else {
+            // aguardamos o carregamento ou erro da imagem antes de esconder
+            const onDone = () => { img.removeEventListener('load', onDone); img.removeEventListener('error', onDone); doHide(); };
+            img.addEventListener('load', onDone);
+            img.addEventListener('error', onDone);
+            // safety timeout: não ficar preso indefinidamente
+            setTimeout(onDone, Math.max(wait + 800, 2000));
+        }
+    } else {
+        doHide();
+    }
+}
+// marca o momento em que o loading ficou visível
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('loading');
+    if (el) el.dataset.shownAt = Date.now();
+});
+window.addEventListener('load', () => hideLoadingOverlay(600));
 let usuarioLogado = null;
 let estoqueLocal = []; 
 let itensParaBaixa = []; 
