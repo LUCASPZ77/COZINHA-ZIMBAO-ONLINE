@@ -1,0 +1,8 @@
+node_modules/
+BACK-END/node_modules/
+BACK-END/.env
+*.log
+dist/
+.env
+/.DS_Store
+.vscode/

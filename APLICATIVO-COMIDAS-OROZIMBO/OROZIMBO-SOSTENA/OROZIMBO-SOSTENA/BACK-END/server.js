@@ -48,14 +48,17 @@ app.get('/logo.jpg', (req, res) => {
   res.status(404).send('Logo not found');
 });
 
-// Cria tabelas se necessário (idempotente)
-try {
-  createUserTable();
-  createStockTable();
-  createConsumoLogTable();
-  console.log('Banco e tabelas inicializados');
-} catch (e) {
-  console.error('Erro ao inicializar tabelas:', e);
+// Cria tabelas se necessário (idempotente) — espera as promessas antes de iniciar
+async function initDb() {
+  try {
+    await createUserTable();
+    await createStockTable();
+    await createConsumoLogTable();
+    console.log('Banco e tabelas inicializados');
+  } catch (e) {
+    console.error('Erro ao inicializar tabelas:', e);
+    throw e;
+  }
 }
 
 // Rotas de API
@@ -71,4 +74,9 @@ app.get('/', (req, res) => res.sendFile(join(pastaFrontEnd, 'index.html')));
 app.use(errorHandler);
 
 const PORT = env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor rodando em http://localhost:${PORT}`));
+initDb().then(() => {
+  app.listen(PORT, () => console.log(`🚀 Servidor rodando em http://localhost:${PORT}`));
+}).catch(err => {
+  console.error('Falha ao inicializar aplicação:', err);
+  process.exit(1);
+});

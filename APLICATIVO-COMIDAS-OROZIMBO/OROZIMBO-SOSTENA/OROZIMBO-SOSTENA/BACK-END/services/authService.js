@@ -24,10 +24,10 @@ export function verifyToken(token) {
 }
 
 export async function registerUser(userData) {
-  const existingCpf = getUserByCpf(userData.cpf);
+  const existingCpf = await getUserByCpf(userData.cpf);
   if (existingCpf) throw new Error('CPF já cadastrado');
 
-  const existingEmail = getUserByEmail(userData.email);
+  const existingEmail = await getUserByEmail(userData.email);
   if (existingEmail) throw new Error('E-mail já cadastrado');
 
   let senha_hash = '';
@@ -49,7 +49,7 @@ export async function registerUser(userData) {
 }
 
 export async function loginUser({ cpf, senha }) {
-  const user = getUserByCpf(cpf);
+  const user = await getUserByCpf(cpf);
   if (!user) throw new Error('Usuário não encontrado');
   // Suporte para login legacy via token (frontend antigo envia { cpf, token })
   if (!senha && typeof cpf === 'string') {
@@ -66,7 +66,7 @@ export async function loginUser({ cpf, senha }) {
 }
 
 export async function loginWithToken({ cpf, token }) {
-  const user = getUserByCpf(cpf);
+  const user = await getUserByCpf(cpf);
   if (!user) throw new Error('Usuário não encontrado');
   const expected = TOKENS_MESTRES[user.cargo];
   if (!expected || token !== expected) throw new Error('Token inválido!');
