@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cozinha-zimbao-backend
+    env: node
+    plan: free
+    repo: https://github.com/LUCASPZ77/COZINHA-ZIMBAO-ONLINE
+    branch: main
+    buildCommand: cd APLICATIVO-COMIDAS-OROZIMBO/OROZIMBO-SOSTENA/OROZIMBO-SOSTENA/BACK-END && npm install
+    startCommand: cd APLICATIVO-COMIDAS-OROZIMBO/OROZIMBO-SOSTENA/OROZIMBO-SOSTENA/BACK-END && node server.js
+    envVars:
+      - key: DATABASE_URL
+        value: ""
+        secure: true
+      - key: JWT_SECRET
+        value: ""
+        secure: true
+      - key: JWT_EXPIRATION
+        value: "8h"
+      - key: NODE_ENV
+        value: "production"
