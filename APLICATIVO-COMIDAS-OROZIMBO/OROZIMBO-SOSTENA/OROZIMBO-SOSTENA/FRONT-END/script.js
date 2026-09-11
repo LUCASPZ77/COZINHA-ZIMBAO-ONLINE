@@ -11,6 +11,16 @@ const SOM_NOTIFICACAO = new Audio('https://assets.mixkit.co/active_storage/sfx/2
 
 // NOVO: Verifica se o usuário já estava logado ao abrir a página (Resolve erro do F5)
 window.addEventListener('load', () => {
+    const loading = document.getElementById('loading');
+    if (loading) {
+        setTimeout(() => {
+            loading.style.opacity = '0';
+            loading.style.transition = 'opacity 0.35s ease';
+            loading.style.pointerEvents = 'none';
+            setTimeout(() => loading.remove(), 400);
+        }, 350);
+    }
+
     const salvo = localStorage.getItem('usuarioLogado');
     if (salvo) {
         usuarioLogado = JSON.parse(salvo);
