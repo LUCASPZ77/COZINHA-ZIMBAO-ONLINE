@@ -637,6 +637,80 @@ table tr:hover {
     }
 }
 
+/* Mobile polish: reduzir 'achatamento' no celular e ajustar toques */
+@media (max-width: 480px) {
+    body {
+        padding: 12px 8px;
+        align-items: flex-start;
+    }
+
+    .box {
+        width: calc(100% - 16px);
+        padding: 0.9rem;
+        border-radius: 12px;
+        margin: 8px auto;
+        box-shadow: 0 18px 40px rgba(2,6,23,0.08);
+    }
+
+    .hero-icon { font-size: 2.25rem; }
+    h2 { font-size: 1.05rem; }
+
+    input, select {
+        padding: 0.85rem;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+
+    .button { padding: 0.8rem; border-radius: 10px; font-size: 0.95rem; }
+
+    .grid-two-columns, .grid-columns { grid-template-columns: 1fr; }
+    .monitor-fluxo { grid-template-columns: 1fr; }
+
+    /* Sidebar: torne o menu-toggle visível e permita que .hidden seja sobrescrito para ele */
+    .menu-toggle.hidden { display: flex !important; }
+    .menu-toggle { left: 12px; top: 12px; width: 42px; height: 42px; border-radius: 10px; }
+
+    /* Sidebar full-screen when open on mobile */
+    .sidebar { width: 0; }
+    .sidebar.open { width: 100%; }
+    .sidebar-header { padding: 18px 14px; }
+
+    #profile-name { max-width: 100px; font-size: 0.95rem; }
+
+    /* Token eye smaller spacing */
+    .input-eye input { padding: 8px 10px; }
+    .eye-btn { font-size: 16px; padding: 6px; }
+
+    /* Loading overlay smaller footprint */
+    #loading .loading-wrap { padding: 18px 20px; }
+    #loading-logo { width: 90px; height: 90px; }
+    .loading-spinner { width: 48px; height: 48px; border-width: 5px; }
+}
+
+/* Desktop-safe rules: keep existing desktop layout unchanged */
+@media (min-width: 481px) {
+    .menu-toggle { display: none; }
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; }
+    .content { margin-left: 260px; }
+    .box { max-width: 980px; margin-left: auto; margin-right: auto; }
+    .grid-two-columns { grid-template-columns: 1fr 420px; }
+}
+
+/* Mobile refinements: stack controls, full-width buttons and clearer spacing */
+@media (max-width: 480px) {
+    .content { padding: 8px; }
+    .grid-two-columns, .grid-columns { gap: 10px; }
+    .controls { display: flex; flex-direction: column; gap: 8px; }
+    .controls .button, .button { width: 100%; box-sizing: border-box; }
+    select, input[type="text"], input[type="number"], textarea { width: 100%; box-sizing: border-box; }
+    .list { padding: 8px; }
+    .list li { padding: 10px 8px; border-radius: 8px; margin-bottom: 8px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .header-actions .action { flex: 1; }
+    /* Ensure touch targets are at least 44px */
+    button, .button, .menu-toggle { min-height: 44px; }
+}
+
 /* --- TELA DE CARREGAMENTO --- */
 /* --- TELA DE CARREGAMENTO --- */
 #loading {
