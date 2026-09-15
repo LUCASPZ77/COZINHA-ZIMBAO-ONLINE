@@ -59,7 +59,10 @@
             <input type="text" id="login-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascararCPF(this)">
             <div class="info-card">
                 <label class="info-card-label"><i class="fas fa-key"></i> Token de Segurança:</label>
-                <input type="password" id="login-token" placeholder="Código do cargo">
+                <div class="input-eye">
+                    <input type="password" id="login-token" placeholder="Código do cargo" aria-label="Token de segurança">
+                    <button id="toggle-token" class="eye-btn" aria-label="Mostrar token" title="Mostrar token">👁️</button>
+                </div>
                 <small class="field-hint">Tokens: Cozinheira = <strong>COZ-2026-SCHOOL</strong>, Diretor = <strong>DIR-2026-MASTER</strong></small>
             </div>
             <button id="btn-login" class="button button--primary mt-20" onclick="executarLogin()">Acessar Sistema</button>
@@ -227,6 +230,15 @@
                     <button onclick="removerItemEstoque()" class="button button--danger">Excluir do Sistema</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay (will be shown for longer requests) -->
+    <div id="loading" class="hidden" role="status" aria-live="polite">
+        <div class="loading-wrap">
+            <img id="loading-logo" src="logo.jpg" alt="Logo">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <div id="loading-msg">Carregando...</div>
         </div>
     </div>
 

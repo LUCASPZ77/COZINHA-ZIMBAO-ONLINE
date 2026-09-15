@@ -9,15 +9,50 @@ const SOM_NOTIFICACAO = new Audio('https://assets.mixkit.co/active_storage/sfx/2
 // 1. INICIALIZAÇÃO E INTERFACE
 // ==========================================
 
+// --- Loading overlay controls ---
+function showLoading(message = 'Carregando...') {
+    const el = document.getElementById('loading');
+    if (!el) return;
+    const wrap = el.querySelector('.loading-wrap');
+    const msg = document.getElementById('loading-msg');
+    if (msg) msg.innerText = message;
+    el.classList.remove('hidden');
+    el.style.display = 'flex';
+}
+
+function hideLoading() {
+    const el = document.getElementById('loading');
+    if (!el) return;
+    el.classList.add('hidden');
+}
+
+// Delay display to avoid flicker for quick requests
+(function installFetchWrapper(){
+    if (!window.fetch) return;
+    const original = window.fetch.bind(window);
+    window.fetch = async function(...args){
+        let shown = false;
+        const timer = setTimeout(()=>{ showLoading(); shown = true; }, 250);
+        try {
+            const res = await original(...args);
+            return res;
+        } finally {
+            clearTimeout(timer);
+            if (shown) setTimeout(hideLoading, 200);
+        }
+    };
+})();
+
+
 // NOVO: Verifica se o usuário já estava logado ao abrir a página (Resolve erro do F5)
 window.addEventListener('load', () => {
     const loading = document.getElementById('loading');
     if (loading) {
+        // gently fade-out pre-existing loading
         setTimeout(() => {
             loading.style.opacity = '0';
             loading.style.transition = 'opacity 0.35s ease';
-            loading.style.pointerEvents = 'none';
-            setTimeout(() => loading.remove(), 400);
+            setTimeout(() => loading.classList.add('hidden'), 420);
         }, 350);
     }
 
@@ -27,6 +62,17 @@ window.addEventListener('load', () => {
         configurarInterfacePorUsuario(usuarioLogado);
     }
     atualizarDataVisor();
+
+    // token eye toggle
+    const toggle = document.getElementById('toggle-token');
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            const input = document.getElementById('login-token');
+            if (!input) return;
+            if (input.type === 'password') { input.type = 'text'; toggle.innerText = '🙈'; toggle.setAttribute('aria-label', 'Ocultar token'); }
+            else { input.type = 'password'; toggle.innerText = '👁️'; toggle.setAttribute('aria-label', 'Mostrar token'); }
+        });
+    }
 });
 
 function atualizarDataVisor() {
