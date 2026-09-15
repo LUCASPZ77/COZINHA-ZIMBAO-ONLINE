@@ -638,6 +638,7 @@ table tr:hover {
 }
 
 /* --- TELA DE CARREGAMENTO --- */
+/* --- TELA DE CARREGAMENTO --- */
 #loading {
     position: fixed;
     inset: 0;
@@ -646,18 +647,53 @@ table tr:hover {
     align-items: center;
     justify-content: center;
     z-index: 9999;
-}
-#loading-logo {
-    width: 180px;
-    height: 180px;
-    object-fit: contain;
-    border-radius: 18px;
-    box-shadow: 0 20px 60px rgba(2,6,23,0.12);
-    animation: pulse 1.6s infinite ease-in-out;
+    pointer-events: none;
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.03); }
-    100% { transform: scale(1); }
+#loading .loading-wrap {
+    pointer-events: auto;
+    background: #fff;
+    border-radius: 14px;
+    padding: 26px 34px;
+    box-shadow: 0 18px 60px rgba(2,6,23,0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
 }
+
+#loading-logo {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+.loading-spinner {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 6px solid rgba(0,0,0,0.08);
+    border-top-color: #2563eb;
+    animation: spin 1s linear infinite;
+}
+
+#loading-msg {
+    font-size: 0.95rem;
+    color: #0f172a;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* hidden state */
+#loading.hidden {
+    display: none !important;
+}
+
+/* --- Token eye input styles --- */
+.input-eye { display:flex; align-items:center; gap:8px; }
+.input-eye input { flex:1; padding:10px 12px; border:1px solid #e6edf3; border-radius:6px; }
+.eye-btn { background:transparent; border:none; cursor:pointer; font-size:18px; padding:6px; border-radius:6px; }
+.eye-btn:focus { outline:2px solid #c7ddff; }
