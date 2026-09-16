@@ -689,9 +689,9 @@ table tr:hover {
 
 /* Desktop-safe rules: keep existing desktop layout unchanged */
 @media (min-width: 481px) {
-    .menu-toggle { display: none; }
-    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; }
-    .content { margin-left: 260px; }
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 0; }
+    .sidebar.open { width: 260px; }
+    .content { margin-left: 0; }
     .box { max-width: 980px; margin-left: auto; margin-right: auto; }
     .grid-two-columns { grid-template-columns: 1fr 420px; }
 }
