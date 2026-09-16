@@ -670,9 +670,9 @@ table tr:hover {
     .menu-toggle.hidden { display: flex !important; }
     .menu-toggle { left: 12px; top: 12px; width: 42px; height: 42px; border-radius: 10px; }
 
-    /* Sidebar full-screen when open on mobile */
-    .sidebar { width: 0; }
-    .sidebar.open { width: 100%; }
+    /* Keep the mobile menu narrow enough to leave the page visible and closable */
+    .sidebar { width: 0; max-width: 86vw; }
+    .sidebar.open { width: min(86vw, 320px); }
     .sidebar-header { padding: 18px 14px; }
 
     #profile-name { max-width: 100px; font-size: 0.95rem; }
