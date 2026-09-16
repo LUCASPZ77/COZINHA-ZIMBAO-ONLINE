@@ -73,6 +73,17 @@ window.addEventListener('load', () => {
             else { input.type = 'password'; toggle.innerText = '👁️'; toggle.setAttribute('aria-label', 'Mostrar token'); }
         });
     }
+
+    document.addEventListener('click', (event) => {
+        const sidebar = document.getElementById('sidebar');
+        const menuToggle = document.getElementById('menu-toggle');
+        if (!sidebar || !sidebar.classList.contains('open')) return;
+        if (!sidebar.contains(event.target) && !menuToggle?.contains(event.target)) fecharMenu();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') fecharMenu();
+    });
 });
 
 function atualizarDataVisor() {
@@ -86,7 +97,16 @@ setInterval(atualizarDataVisor, 60000);
 
 function toggleMenu() {
     const sidebar = document.getElementById('sidebar');
-    if (sidebar) sidebar.classList.toggle('open');
+    if (!sidebar) return;
+    sidebar.classList.toggle('open');
+    document.getElementById('menu-toggle')?.setAttribute('aria-expanded', String(sidebar.classList.contains('open')));
+}
+
+function fecharMenu() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    sidebar.classList.remove('open');
+    document.getElementById('menu-toggle')?.setAttribute('aria-expanded', 'false');
 }
 
 function ajustarBrilho(valor) {
