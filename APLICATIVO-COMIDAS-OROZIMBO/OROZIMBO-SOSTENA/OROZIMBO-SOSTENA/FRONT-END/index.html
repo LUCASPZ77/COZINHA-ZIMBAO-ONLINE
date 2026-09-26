@@ -8,10 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div id="loading" aria-live="polite">
-        <img id="loading-logo" src="logo.jpg" alt="" onerror="this.onerror=null;this.src='icons/icon-512.jpg'">
-    </div>
-
     <div id="sidebar" class="sidebar">
         <div class="sidebar-header">
             <label for="upload-foto" class="avatar-upload">
@@ -233,12 +229,11 @@
         </div>
     </div>
 
-    <!-- Loading overlay (will be shown for longer requests) -->
-    <div id="loading" class="hidden" role="status" aria-live="polite">
+    <div id="loading" class="hidden" role="status" aria-live="polite" aria-busy="true">
         <div class="loading-wrap">
-            <img id="loading-logo" src="logo.jpg" alt="Logo">
-            <div class="loading-spinner" aria-hidden="true"></div>
+            <img id="loading-logo" src="logo.jpg" alt="Logo" onerror="this.onerror=null;this.src='icons/icon-512.jpg'">
             <div id="loading-msg">Carregando...</div>
+            <div class="loading-progress" aria-hidden="true"><span></span></div>
         </div>
     </div>
 

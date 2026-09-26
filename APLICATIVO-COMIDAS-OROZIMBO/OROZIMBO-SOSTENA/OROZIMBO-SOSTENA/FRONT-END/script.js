@@ -10,10 +10,13 @@ const SOM_NOTIFICACAO = new Audio('https://assets.mixkit.co/active_storage/sfx/2
 // ==========================================
 
 // --- Loading overlay controls ---
+let activeRequests = 0;
+let loadingTimer = null;
+let hideLoadingTimer = null;
+
 function showLoading(message = 'Carregando...') {
     const el = document.getElementById('loading');
     if (!el) return;
-    const wrap = el.querySelector('.loading-wrap');
     const msg = document.getElementById('loading-msg');
     if (msg) msg.innerText = message;
     el.classList.remove('hidden');
@@ -26,19 +29,43 @@ function hideLoading() {
     el.classList.add('hidden');
 }
 
-// Delay display to avoid flicker for quick requests
+function mensagemDaRequisicao(url, method) {
+    if (url.includes('/login')) return 'Entrando no Sistema...';
+    if (url.includes('/usuarios/registrar')) return 'Cadastrando usuário...';
+    if (url.includes('/lista-estoque')) return 'Carregando estoque...';
+    if (url.includes('/relatorios')) return 'Carregando histórico...';
+    if (url.includes('/baixa')) return 'Registrando saída...';
+    if (url.includes('/estoque/importar')) return 'Importando planilha...';
+    if (url.includes('/estoque/manual')) return 'Salvando entrada no estoque...';
+    if (url.includes('/estoque/') && method === 'PUT') return 'Atualizando estoque...';
+    if (url.includes('/estoque/') && method === 'DELETE') return 'Removendo lote...';
+    if (url.includes('/logs/') && method === 'DELETE') return 'Excluindo registro...';
+    return 'Processando...';
+}
+
 (function installFetchWrapper(){
     if (!window.fetch) return;
     const original = window.fetch.bind(window);
     window.fetch = async function(...args){
-        let shown = false;
-        const timer = setTimeout(()=>{ showLoading(); shown = true; }, 250);
+        const request = args[0];
+        const options = args[1] || {};
+        const url = typeof request === 'string' ? request : request.url;
+        const method = (options.method || request.method || 'GET').toUpperCase();
+        activeRequests++;
+        clearTimeout(hideLoadingTimer);
+        if (activeRequests === 1) {
+            loadingTimer = setTimeout(() => showLoading(mensagemDaRequisicao(url, method)), 250);
+        } else if (!document.getElementById('loading')?.classList.contains('hidden')) {
+            showLoading(mensagemDaRequisicao(url, method));
+        }
         try {
-            const res = await original(...args);
-            return res;
+            return await original(...args);
         } finally {
-            clearTimeout(timer);
-            if (shown) setTimeout(hideLoading, 200);
+            activeRequests--;
+            if (activeRequests === 0) {
+                clearTimeout(loadingTimer);
+                hideLoadingTimer = setTimeout(hideLoading, 250);
+            }
         }
     };
 })();
@@ -46,16 +73,6 @@ function hideLoading() {
 
 // NOVO: Verifica se o usuário já estava logado ao abrir a página (Resolve erro do F5)
 window.addEventListener('load', () => {
-    const loading = document.getElementById('loading');
-    if (loading) {
-        // gently fade-out pre-existing loading
-        setTimeout(() => {
-            loading.style.opacity = '0';
-            loading.style.transition = 'opacity 0.35s ease';
-            setTimeout(() => loading.classList.add('hidden'), 420);
-        }, 350);
-    }
-
     const salvo = localStorage.getItem('usuarioLogado');
     if (salvo) {
         usuarioLogado = JSON.parse(salvo);
@@ -399,14 +416,14 @@ async function processarExcel(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    showLoading('Lendo planilha...');
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const planilha = workbook.Sheets[workbook.SheetNames[0]];
-        const dados = XLSX.utils.sheet_to_json(planilha);
-
         try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const planilha = workbook.Sheets[workbook.SheetNames[0]];
+            const dados = XLSX.utils.sheet_to_json(planilha);
             const res = await fetch(`${API_URL}/estoque/importar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -418,7 +435,12 @@ async function processarExcel(event) {
             } else {
                 alert("Erro ao processar dados no servidor.");
             }
-        } catch (err) { alert("Erro ao importar Excel."); }
+        } catch (err) { alert("Erro ao processar a planilha."); }
+        finally { hideLoading(); }
+    };
+    reader.onerror = () => {
+        hideLoading();
+        alert("Não foi possível ler a planilha.");
     };
     reader.readAsArrayBuffer(file);
 }
