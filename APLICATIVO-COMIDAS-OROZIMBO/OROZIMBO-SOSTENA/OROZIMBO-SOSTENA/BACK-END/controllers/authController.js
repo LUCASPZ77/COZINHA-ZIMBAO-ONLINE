@@ -1,4 +1,4 @@
-import { registerUser, loginUser, loginWithToken } from '../services/authService.js';
+import { registerUser, loginUser, loginWithToken, signToken } from '../services/authService.js';
 
 export async function registerController(req, res, next) {
   try {
@@ -15,7 +15,8 @@ export async function loginController(req, res, next) {
     if (token && !senha) {
       const result = await loginWithToken({ cpf, token });
       const user = result.user;
-      return res.json({ id: user.id, nome: user.nome, sobrenome: user.sobrenome, cargo: user.cargo, email: user.email, cpf: user.cpf });
+      const accessToken = signToken({ id: user.id, nome: user.nome, sobrenome: user.sobrenome, cargo: user.cargo, email: user.email, cpf: user.cpf });
+      return res.json({ id: user.id, nome: user.nome, sobrenome: user.sobrenome, cargo: user.cargo, email: user.email, cpf: user.cpf, accessToken });
     }
     const { user, token: jwtToken } = await loginUser(req.body);
     res.json({ user: { id: user.id, nome: user.nome, sobrenome: user.sobrenome, cargo: user.cargo, email: user.email, cpf: user.cpf }, token: jwtToken });

@@ -6,6 +6,7 @@ import env from './config/env.js';
 
 import authRoutes from './routes/authRoutes.js';
 import stockRoutes from './routes/stockRoutes.js';
+import collaborationRoutes from './routes/collaborationRoutes.js';
 import { loginController } from './controllers/authController.js';
 
 import { requestLogger } from './middlewares/requestLogger.js';
@@ -14,6 +15,7 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { createUserTable } from './models/userModel.js';
 import { createStockTable } from './models/stockModel.js';
 import { createConsumoLogTable } from './models/consumoLogModel.js';
+import { createCollaborationTables } from './models/collaborationModel.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pastaFrontEnd = join(__dirname, '..', 'FRONT-END');
@@ -54,6 +56,7 @@ async function initDb() {
     await createUserTable();
     await createStockTable();
     await createConsumoLogTable();
+    await createCollaborationTables();
     console.log('Banco e tabelas inicializados');
   } catch (e) {
     console.error('Erro ao inicializar tabelas:', e);
@@ -65,6 +68,7 @@ async function initDb() {
 app.use('/usuarios', authRoutes); // /usuarios/registrar
 app.post('/login', loginController); // mantém /login para compatibilidade com frontend antigo
 app.use('/', stockRoutes); // endpoints: /lista-estoque, /baixa, /relatorios, /estoque/:id, /logs/:id
+app.use('/api', collaborationRoutes);
 
 // Front-end estático
 app.use(express.static(pastaFrontEnd));

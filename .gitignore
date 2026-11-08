@@ -4,5 +4,7 @@ BACK-END/.env
 *.log
 dist/
 .env
+**/.env
+APLICATIVO-COMIDAS-OROZIMBO/OROZIMBO-SOSTENA/OROZIMBO-SOSTENA/BACK-END/db.json
 /.DS_Store
 .vscode/

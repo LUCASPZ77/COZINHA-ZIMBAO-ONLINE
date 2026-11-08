@@ -1,4 +1,5 @@
 import { listStock, processBaixa, listLogs, removeLog, removeStockItem, addManual, importExcel, editStock } from '../services/stockService.js';
+import { createBaixaNotification } from './collaborationController.js';
 
 export async function getStockController(req, res, next) {
   try {
@@ -11,8 +12,13 @@ export async function getStockController(req, res, next) {
 
 export async function postBaixaController(req, res, next) {
   try {
-    const { prato, periodo, itens, usuarioCpf, usuarioNome } = req.body;
-    await processBaixa({ itens, usuarioCpf, usuarioNome, prato, periodo });
+    const { prato, periodo, itens } = req.body;
+    await processBaixa({ itens, usuarioCpf: req.user.cpf, usuarioNome: req.user.nome, prato, periodo });
+    try {
+      await createBaixaNotification(req.user, prato, periodo, itens);
+    } catch (notificationError) {
+      console.error('Baixa concluída, mas não foi possível salvar a notificação:', notificationError);
+    }
     res.json({ message: 'Baixa realizada com sucesso' });
   } catch (error) {
     next(error);

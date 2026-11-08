@@ -130,6 +130,13 @@
                 <i class="fas fa-check-circle"></i> Confirmar Saída de Estoque
             </button>
         </div>
+        <section class="communication-section" aria-labelledby="titulo-mensagens-cozinha">
+            <div class="communication-heading">
+                <h3 id="titulo-mensagens-cozinha"><i class="fas fa-comment-dots"></i> Mensagens da Direção</h3>
+                <span class="realtime-status" data-realtime-status>Conectando...</span>
+            </div>
+            <div id="lista-mensagens-cozinha" class="message-list" role="log" aria-live="polite"></div>
+        </section>
     </div>
 
     <div id="diretor-view" class="box hidden">
@@ -146,6 +153,8 @@
             <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-pratos')">Pratos do Dia</button>
             <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-conferencia')">Conferir</button>
             <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-estoque')">Gerenciar</button>
+            <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-notificacoes')">Notificações <span id="notification-count" class="notification-count hidden">0</span></button>
+            <button class="tab-btn" onclick="abrirAbaDiretor(event, 'aba-mensagens')">Mensagens</button>
         </div>
 
         <div id="aba-historico" class="tab-content">
@@ -227,7 +236,40 @@
                 </div>
             </div>
         </div>
+
+        <div id="aba-notificacoes" class="tab-content hidden">
+            <div class="communication-heading">
+                <div>
+                    <h3 class="section-title">Atividade da cozinha</h3>
+                    <p class="field-hint">Baixas de refeições registradas, com responsável e horário.</p>
+                </div>
+                <button onclick="marcarNotificacoesComoLidas()" class="button button--secondary button--compact"><i class="fas fa-check-double"></i> Marcar como lidas</button>
+            </div>
+            <div id="lista-notificacoes" class="notification-list" aria-live="polite"></div>
+        </div>
+
+        <div id="aba-mensagens" class="tab-content hidden">
+            <div class="communication-heading">
+                <div>
+                    <h3 class="section-title">Mensagens para a cozinha</h3>
+                    <p class="field-hint">As mensagens são entregues em tempo real para as cozinheiras.</p>
+                </div>
+                <span class="realtime-status" data-realtime-status>Conectando...</span>
+            </div>
+            <form class="message-composer" onsubmit="enviarMensagem(event)">
+                <label for="mensagem-diretor">Nova mensagem</label>
+                <textarea id="mensagem-diretor" maxlength="2000" rows="3" placeholder="Escreva um recado para a equipe da cozinha..." required></textarea>
+                <button type="submit" class="button button--primary button--compact"><i class="fas fa-paper-plane"></i> Enviar mensagem</button>
+            </form>
+            <div id="lista-mensagens-diretor" class="message-list" role="log" aria-live="polite"></div>
+        </div>
     </div>
+
+    <aside id="live-toast" class="live-toast hidden" role="status" aria-live="polite">
+        <span class="live-toast-icon"><i class="fas fa-bell"></i></span>
+        <span><strong id="live-toast-title"></strong><small id="live-toast-detail"></small></span>
+        <button type="button" onclick="dispensarNotificacaoAoVivo()" aria-label="Fechar aviso">&times;</button>
+    </aside>
 
     <div id="loading" class="hidden" role="status" aria-live="polite" aria-busy="true">
         <div class="loading-wrap">

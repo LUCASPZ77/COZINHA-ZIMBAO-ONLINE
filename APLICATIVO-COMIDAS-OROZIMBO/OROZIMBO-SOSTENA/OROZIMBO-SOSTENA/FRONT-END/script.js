@@ -1,7 +1,12 @@
-const API_URL = 'https://cozinha-zimbao-online.onrender.com';
+const API_URL = ['localhost', '127.0.0.1'].includes(location.hostname) ? location.origin : 'https://cozinha-zimbao-online.onrender.com';
 let usuarioLogado = null;
 let estoqueLocal = []; 
 let itensParaBaixa = []; 
+let realtimeSource = null;
+let realtimeReconnectTimer = null;
+let notificacoes = [];
+let mensagens = [];
+let toastTimer = null;
 
 const SOM_NOTIFICACAO = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
@@ -76,7 +81,12 @@ window.addEventListener('load', () => {
     const salvo = localStorage.getItem('usuarioLogado');
     if (salvo) {
         usuarioLogado = JSON.parse(salvo);
-        configurarInterfacePorUsuario(usuarioLogado);
+        if (usuarioLogado.accessToken) configurarInterfacePorUsuario(usuarioLogado);
+        else {
+            localStorage.removeItem('usuarioLogado');
+            usuarioLogado = null;
+            alert('Sua sessão precisa ser renovada para ativar notificações e mensagens. Entre novamente.');
+        }
     }
     atualizarDataVisor();
 
@@ -132,6 +142,8 @@ function ajustarBrilho(valor) {
 
 function logout() {
     if (confirm("Deseja realmente sair do sistema?")) {
+    realtimeSource?.close();
+    clearTimeout(realtimeReconnectTimer);
         localStorage.removeItem('usuarioLogado'); // Limpa o login salvo
         usuarioLogado = null;
         location.reload();
@@ -157,6 +169,8 @@ function configurarInterfacePorUsuario(data) {
     document.getElementById('profile-role').innerText = data.cargo;
     document.getElementById('menu-toggle').classList.remove('hidden');
     document.getElementById('login-view').classList.add('hidden');
+    conectarEventosEmTempoReal();
+    carregarMensagens();
 
     if (data.cargo === 'Cozinheira') {
         document.getElementById('cozinha-view').classList.remove('hidden');
@@ -166,6 +180,7 @@ function configurarInterfacePorUsuario(data) {
         document.getElementById('diretor-view').classList.remove('hidden');
         document.getElementById('admin-display').innerText = data.nome;
         carregarListasFluxo();
+        carregarNotificacoes();
     }
 }
 
@@ -347,8 +362,8 @@ async function enviarBaixaCompleta() {
     try {
         const response = await fetch(`${API_URL}/baixa`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prato, periodo, itens: itensParaBaixa, usuarioNome: usuarioLogado.nome })
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${usuarioLogado.accessToken}` },
+            body: JSON.stringify({ prato, periodo, itens: itensParaBaixa })
         });
         if (response.ok) {
             SOM_NOTIFICACAO.play();
@@ -384,6 +399,8 @@ function abrirAbaDiretor(event, abaId) {
     else if (abaId === 'aba-pratos') { verGastoDoDia(); }
     else if (abaId === 'aba-conferencia') { carregarTabelaConferencia(); }
     else if (abaId === 'aba-estoque') { carregarSelectExclusao(); }
+    else if (abaId === 'aba-notificacoes') { carregarNotificacoes(); }
+    else if (abaId === 'aba-mensagens') { carregarMensagens(); }
 }
 
 async function adicionarNovoEstoque() {
@@ -655,4 +672,201 @@ function trocarFotoPerfil(event) {
         output.innerHTML = `<img src="${reader.result}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
     }
     reader.readAsDataURL(event.target.files[0]);
+}
+
+function cabecalhosAutenticados(extra = {}) {
+    return { ...extra, Authorization: `Bearer ${usuarioLogado?.accessToken || ''}` };
+}
+
+function formatarDataHora(valor) {
+    const data = new Date(valor);
+    return Number.isNaN(data.getTime()) ? 'Horário indisponível' : data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function atualizarStatusTempoReal(texto, conectado) {
+    document.querySelectorAll('[data-realtime-status]').forEach(elemento => {
+        elemento.textContent = texto;
+        elemento.classList.toggle('is-online', conectado);
+    });
+}
+
+async function carregarNotificacoes() {
+    if (usuarioLogado?.cargo !== 'Diretor') return;
+    try {
+        const response = await fetch(`${API_URL}/api/notifications`, { headers: cabecalhosAutenticados() });
+        if (!response.ok) throw new Error('Não foi possível carregar as notificações.');
+        const carregadas = await response.json();
+        const idsCarregados = new Set(carregadas.map(item => String(item.id)));
+        const recebidasAoVivo = notificacoes.filter(item => !idsCarregados.has(String(item.id)));
+        notificacoes = [...recebidasAoVivo, ...carregadas].slice(0, 100);
+        renderizarNotificacoes();
+    } catch (error) {
+        const lista = document.getElementById('lista-notificacoes');
+        if (lista) lista.textContent = error.message;
+    }
+}
+
+function renderizarNotificacoes() {
+    const lista = document.getElementById('lista-notificacoes');
+    const badge = document.getElementById('notification-count');
+    const naoLidas = notificacoes.filter(item => !item.read_at).length;
+    if (badge) {
+        badge.textContent = naoLidas > 9 ? '9+' : String(naoLidas);
+        badge.classList.toggle('hidden', naoLidas === 0);
+    }
+    if (!lista) return;
+    lista.replaceChildren();
+    if (notificacoes.length === 0) {
+        lista.textContent = 'Nenhuma notificação por enquanto.';
+        return;
+    }
+    notificacoes.forEach(item => {
+        const row = document.createElement('article');
+        row.className = `notification-item${item.read_at ? '' : ' is-unread'}`;
+        const icon = document.createElement('span');
+        icon.className = 'notification-item-icon';
+        icon.innerHTML = '<i class="fas fa-utensils" aria-hidden="true"></i>';
+        const content = document.createElement('div');
+        content.className = 'notification-item-content';
+        const message = document.createElement('strong');
+        message.textContent = item.message;
+        const details = document.createElement('small');
+        details.textContent = `${item.actor_name} · ${formatarDataHora(item.created_at)}`;
+        content.append(message, details);
+        row.append(icon, content);
+        lista.appendChild(row);
+    });
+}
+
+async function marcarNotificacoesComoLidas() {
+    try {
+        const response = await fetch(`${API_URL}/api/notifications/read-all`, {
+            method: 'POST',
+            headers: cabecalhosAutenticados()
+        });
+        if (!response.ok) throw new Error('Não foi possível atualizar as notificações.');
+        const agora = new Date().toISOString();
+        notificacoes = notificacoes.map(item => ({ ...item, read_at: item.read_at || agora }));
+        renderizarNotificacoes();
+    } catch (error) { alert(error.message); }
+}
+
+function renderizarMensagens() {
+    ['lista-mensagens-diretor', 'lista-mensagens-cozinha'].forEach(id => {
+        const lista = document.getElementById(id);
+        if (!lista) return;
+        lista.replaceChildren();
+        if (mensagens.length === 0) {
+            lista.textContent = 'Nenhuma mensagem ainda.';
+            return;
+        }
+        mensagens.forEach(item => {
+            const row = document.createElement('article');
+            row.className = 'message-item';
+            const heading = document.createElement('div');
+            heading.className = 'message-item-heading';
+            const sender = document.createElement('strong');
+            sender.textContent = item.sender_name;
+            const time = document.createElement('time');
+            time.dateTime = item.created_at;
+            time.textContent = formatarDataHora(item.created_at);
+            const body = document.createElement('p');
+            body.textContent = item.body;
+            heading.append(sender, time);
+            row.append(heading, body);
+            lista.appendChild(row);
+        });
+    });
+}
+
+async function carregarMensagens() {
+    if (!usuarioLogado?.accessToken) return;
+    try {
+        const response = await fetch(`${API_URL}/api/messages`, { headers: cabecalhosAutenticados() });
+        if (!response.ok) throw new Error('Não foi possível carregar as mensagens.');
+        const carregadas = await response.json();
+        const mescladas = new Map([...carregadas, ...mensagens].map(item => [String(item.id), item]));
+        mensagens = [...mescladas.values()]
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+            .slice(-100);
+        renderizarMensagens();
+    } catch (error) {
+        document.querySelectorAll('.message-list').forEach(lista => { lista.textContent = error.message; });
+    }
+}
+
+async function enviarMensagem(event) {
+    event.preventDefault();
+    const input = document.getElementById('mensagem-diretor');
+    const body = input.value.trim();
+    if (!body) return;
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+        const response = await fetch(`${API_URL}/api/messages`, {
+            method: 'POST',
+            headers: cabecalhosAutenticados({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ body })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a mensagem.');
+        mensagens = [...mensagens.filter(item => item.id !== result.id), result].slice(-100);
+        input.value = '';
+        renderizarMensagens();
+    } catch (error) { alert(error.message); }
+    finally { button.disabled = false; }
+}
+
+function mostrarNotificacaoAoVivo(notification) {
+    const toast = document.getElementById('live-toast');
+    if (!toast || usuarioLogado?.cargo !== 'Diretor') return;
+    document.getElementById('live-toast-title').textContent = notification.actor_name || 'Equipe da cozinha';
+    document.getElementById('live-toast-detail').textContent = `${notification.message} · ${formatarDataHora(notification.created_at)}`;
+    toast.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(dispensarNotificacaoAoVivo, 8000);
+}
+
+function dispensarNotificacaoAoVivo() {
+    document.getElementById('live-toast')?.classList.add('hidden');
+    clearTimeout(toastTimer);
+}
+
+async function conectarEventosEmTempoReal() {
+    if (!usuarioLogado?.accessToken) return;
+    realtimeSource?.close();
+    clearTimeout(realtimeReconnectTimer);
+    atualizarStatusTempoReal('Conectando...', false);
+    try {
+        const ticketResponse = await fetch(`${API_URL}/api/events/ticket`, { headers: cabecalhosAutenticados() });
+        if (!ticketResponse.ok) throw new Error('Não foi possível iniciar a conexão em tempo real.');
+        const { ticket } = await ticketResponse.json();
+        if (!usuarioLogado?.accessToken) return;
+        const source = new EventSource(`${API_URL}/api/events?ticket=${encodeURIComponent(ticket)}`);
+        realtimeSource = source;
+        source.onopen = () => atualizarStatusTempoReal('Em tempo real', true);
+        source.addEventListener('notification', event => {
+            const notification = JSON.parse(event.data);
+            if (usuarioLogado?.cargo !== 'Diretor') return;
+            if (!notificacoes.some(item => item.id === notification.id)) notificacoes.unshift(notification);
+            renderizarNotificacoes();
+            mostrarNotificacaoAoVivo(notification);
+        });
+        source.addEventListener('message', event => {
+            const message = JSON.parse(event.data);
+            if (!mensagens.some(item => item.id === message.id)) mensagens.push(message);
+            mensagens = mensagens.slice(-100);
+            renderizarMensagens();
+        });
+        source.onerror = () => {
+            source.close();
+            if (realtimeSource !== source) return;
+            realtimeSource = null;
+            atualizarStatusTempoReal('Reconectando...', false);
+            realtimeReconnectTimer = setTimeout(conectarEventosEmTempoReal, 2500);
+        };
+    } catch {
+        atualizarStatusTempoReal('Reconectando...', false);
+        realtimeReconnectTimer = setTimeout(conectarEventosEmTempoReal, 4000);
+    }
 }
