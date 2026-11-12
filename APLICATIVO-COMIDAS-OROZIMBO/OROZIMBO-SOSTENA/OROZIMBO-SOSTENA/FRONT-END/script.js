@@ -6,6 +6,11 @@ let realtimeSource = null;
 let realtimeReconnectTimer = null;
 let notificacoes = [];
 let mensagens = [];
+let contatosChat = [];
+let contatoSelecionadoId = null;
+let respostaSelecionada = null;
+let mensagemParaCompartilharId = null;
+let naoLidasPorContato = new Map();
 let toastTimer = null;
 
 const SOM_NOTIFICACAO = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -170,7 +175,7 @@ function configurarInterfacePorUsuario(data) {
     document.getElementById('menu-toggle').classList.remove('hidden');
     document.getElementById('login-view').classList.add('hidden');
     conectarEventosEmTempoReal();
-    carregarMensagens();
+    carregarContatos();
 
     if (data.cargo === 'Cozinheira') {
         document.getElementById('cozinha-view').classList.remove('hidden');
@@ -400,7 +405,7 @@ function abrirAbaDiretor(event, abaId) {
     else if (abaId === 'aba-conferencia') { carregarTabelaConferencia(); }
     else if (abaId === 'aba-estoque') { carregarSelectExclusao(); }
     else if (abaId === 'aba-notificacoes') { carregarNotificacoes(); }
-    else if (abaId === 'aba-mensagens') { carregarMensagens(); }
+    else if (abaId === 'aba-mensagens') { carregarContatos(); }
 }
 
 async function adicionarNovoEstoque() {
@@ -751,70 +756,351 @@ async function marcarNotificacoesComoLidas() {
     } catch (error) { alert(error.message); }
 }
 
-function renderizarMensagens() {
-    ['lista-mensagens-diretor', 'lista-mensagens-cozinha'].forEach(id => {
-        const lista = document.getElementById(id);
-        if (!lista) return;
-        lista.replaceChildren();
-        if (mensagens.length === 0) {
-            lista.textContent = 'Nenhuma mensagem ainda.';
+function nomeCompletoChat(contact) {
+    return [contact?.nome, contact?.sobrenome].filter(Boolean).join(' ') || 'Usuário';
+}
+
+function avatarChat(contact) {
+    return nomeCompletoChat(contact).split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+}
+
+async function carregarContatos() {
+    if (!usuarioLogado?.accessToken) return;
+    try {
+        const response = await fetch(`${API_URL}/api/contacts`, { headers: cabecalhosAutenticados() });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Não foi possível carregar os contatos.');
+        contatosChat = result;
+        renderizarContatos();
+        if (!contatosChat.some(contact => Number(contact.id) === Number(contatoSelecionadoId))) {
+            contatoSelecionadoId = contatosChat[0]?.id || null;
+            mensagens = [];
+            respostaSelecionada = null;
+        }
+        renderizarChat();
+        if (contatoSelecionadoId) await carregarMensagens();
+    } catch (error) {
+        document.querySelectorAll('.chat-contacts').forEach(list => {
+            list.replaceChildren();
+            const message = document.createElement('p');
+            message.className = 'chat-empty-contacts';
+            message.textContent = error.message;
+            list.appendChild(message);
+        });
+    }
+}
+
+function renderizarContatos() {
+    const ordered = [...contatosChat].sort((a, b) => Number(b.online) - Number(a.online) || nomeCompletoChat(a).localeCompare(nomeCompletoChat(b), 'pt-BR'));
+    ['diretor', 'cozinha'].forEach(view => {
+        const list = document.getElementById(`lista-contatos-${view}`);
+        if (!list) return;
+        const search = document.getElementById(`busca-contatos-${view}`)?.value.trim().toLocaleLowerCase('pt-BR') || '';
+        const filtered = ordered.filter(contact => `${nomeCompletoChat(contact)} ${contact.cargo}`.toLocaleLowerCase('pt-BR').includes(search));
+        list.replaceChildren();
+        if (filtered.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'chat-empty-contacts';
+            empty.textContent = contatosChat.length ? 'Nenhum contato corresponde à busca.' : 'Nenhum outro usuário cadastrado.';
+            list.appendChild(empty);
             return;
         }
-        mensagens.forEach(item => {
-            const row = document.createElement('article');
-            row.className = 'message-item';
-            const heading = document.createElement('div');
-            heading.className = 'message-item-heading';
-            const sender = document.createElement('strong');
-            sender.textContent = item.sender_name;
-            const time = document.createElement('time');
-            time.dateTime = item.created_at;
-            time.textContent = formatarDataHora(item.created_at);
-            const body = document.createElement('p');
-            body.textContent = item.body;
-            heading.append(sender, time);
-            row.append(heading, body);
-            lista.appendChild(row);
+        filtered.forEach(contact => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `chat-contact${contact.online ? ' is-online' : ''}${Number(contact.id) === Number(contatoSelecionadoId) ? ' is-selected' : ''}`;
+            button.setAttribute('role', 'listitem');
+            button.setAttribute('aria-label', `${nomeCompletoChat(contact)}, ${contact.cargo}, ${contact.online ? 'online' : 'offline'}`);
+            button.addEventListener('click', () => selecionarContato(contact.id));
+
+            const avatar = document.createElement('span');
+            avatar.className = 'chat-contact-avatar';
+            avatar.textContent = avatarChat(contact);
+            const copy = document.createElement('span');
+            copy.className = 'chat-contact-copy';
+            const name = document.createElement('strong');
+            name.textContent = nomeCompletoChat(contact);
+            const detail = document.createElement('small');
+            const unread = naoLidasPorContato.get(Number(contact.id)) || 0;
+            detail.textContent = `${contact.cargo}${unread ? ` · ${unread} nova${unread > 1 ? 's' : ''}` : ''}`;
+            const dot = document.createElement('span');
+            dot.className = 'chat-presence-dot';
+            dot.title = contact.online ? 'Online' : 'Offline';
+            copy.append(name, detail);
+            button.append(avatar, copy, dot);
+            list.appendChild(button);
         });
+    });
+    atualizarDestinoCompartilhamento();
+}
+
+async function selecionarContato(contactId) {
+    contatoSelecionadoId = Number(contactId);
+    mensagens = [];
+    respostaSelecionada = null;
+    naoLidasPorContato.delete(contatoSelecionadoId);
+    renderizarContatos();
+    renderizarChat();
+    await carregarMensagens();
+}
+
+function contatoSelecionado() {
+    return contatosChat.find(contact => Number(contact.id) === Number(contatoSelecionadoId));
+}
+
+function criarEstadoChat(title, detail) {
+    const empty = document.createElement('div');
+    empty.className = 'chat-empty-state';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-comments';
+    icon.setAttribute('aria-hidden', 'true');
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const copy = document.createElement('span');
+    copy.textContent = detail;
+    empty.append(icon, heading, copy);
+    return empty;
+}
+
+function criarAcaoMensagem(label, iconName, action, messageId, dangerous = false) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `chat-action-button${dangerous ? ' is-danger' : ''}`;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = `<i class="fas ${iconName}" aria-hidden="true"></i>`;
+    button.addEventListener('click', () => action(messageId));
+    return button;
+}
+
+function criarElementoMensagem(message) {
+    const isMine = message.is_mine ?? Number(message.sender_user_id) === Number(usuarioLogado?.id);
+    const row = document.createElement('article');
+    row.className = `chat-message${isMine ? ' is-mine' : ''}`;
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-message-bubble';
+
+    if (!isMine) {
+        const sender = document.createElement('div');
+        sender.className = 'chat-message-sender';
+        sender.textContent = message.sender_name;
+        bubble.appendChild(sender);
+    }
+    if (message.forwarded_from_id) {
+        const forwarded = document.createElement('div');
+        forwarded.className = 'chat-message-forwarded';
+        forwarded.textContent = `Encaminhada${message.forwarded_sender_name ? ` de ${message.forwarded_sender_name}` : ''}`;
+        bubble.appendChild(forwarded);
+    }
+    if (message.reply_to_message_id) {
+        const quote = document.createElement('blockquote');
+        quote.className = 'chat-reply-quote';
+        const quoteSender = document.createElement('strong');
+        quoteSender.textContent = message.reply_sender_name || 'Mensagem anterior';
+        const quoteBody = document.createElement('span');
+        quoteBody.textContent = message.reply_deleted_for_all_at ? 'Mensagem apagada' : (message.reply_body || 'Conteúdo indisponível');
+        quote.append(quoteSender, quoteBody);
+        bubble.appendChild(quote);
+    }
+    const body = document.createElement('p');
+    body.textContent = message.deleted_for_all_at ? 'Esta mensagem foi apagada.' : message.body;
+    if (message.deleted_for_all_at) body.classList.add('chat-deleted-copy');
+    bubble.appendChild(body);
+    row.appendChild(bubble);
+
+    if (!message.deleted_for_all_at) {
+        const actions = document.createElement('div');
+        actions.className = 'chat-message-actions';
+        actions.appendChild(criarAcaoMensagem('Responder', 'fa-reply', responderMensagem, message.id));
+        actions.appendChild(criarAcaoMensagem('Compartilhar', 'fa-share', prepararCompartilhamento, message.id));
+        actions.appendChild(criarAcaoMensagem('Apagar para mim', 'fa-trash', apagarParaMim, message.id, true));
+        if (isMine) actions.appendChild(criarAcaoMensagem('Apagar para todos', 'fa-trash-alt', apagarParaTodos, message.id, true));
+        row.appendChild(actions);
+    }
+
+    const meta = document.createElement('time');
+    meta.className = 'chat-message-meta';
+    meta.dateTime = message.created_at;
+    meta.textContent = formatarDataHora(message.created_at);
+    row.appendChild(meta);
+    return row;
+}
+
+function renderizarChat() {
+    const contact = contatoSelecionado();
+    ['diretor', 'cozinha'].forEach(view => {
+        const header = document.getElementById(`cabecalho-chat-${view}`);
+        const thread = document.getElementById(`lista-mensagens-${view}`);
+        const textarea = document.getElementById(`mensagem-${view}`);
+        const replyPreview = document.getElementById(`resposta-chat-${view}`);
+        const sendButton = document.querySelector(`#form-mensagem-${view} .chat-send-button`);
+        if (!header || !thread || !textarea || !replyPreview) return;
+
+        header.replaceChildren();
+        if (contact) {
+            const avatar = document.createElement('span');
+            avatar.className = 'chat-contact-avatar';
+            avatar.textContent = avatarChat(contact);
+            const copy = document.createElement('span');
+            const name = document.createElement('strong');
+            name.textContent = nomeCompletoChat(contact);
+            const role = document.createElement('small');
+            role.textContent = `${contact.cargo} · ${contact.online ? 'Online' : 'Offline'}`;
+            copy.append(name, role);
+            header.append(avatar, copy);
+        } else {
+            const title = document.createElement('strong');
+            title.textContent = 'Selecione um contato';
+            header.appendChild(title);
+        }
+
+        thread.replaceChildren();
+        if (!contact) thread.appendChild(criarEstadoChat('Suas conversas', 'Escolha um contato para começar uma conversa individual.'));
+        else if (mensagens.length === 0) thread.appendChild(criarEstadoChat('Início da conversa', 'Envie uma mensagem para iniciar este diálogo.'));
+        else mensagens.forEach(message => thread.appendChild(criarElementoMensagem(message)));
+
+        textarea.disabled = !contact;
+        textarea.placeholder = contact ? `Mensagem para ${contact.nome}...` : 'Selecione um contato para enviar mensagens';
+        if (sendButton) sendButton.disabled = !contact;
+        replyPreview.replaceChildren();
+        replyPreview.classList.toggle('hidden', !respostaSelecionada || !contact);
+        if (respostaSelecionada && contact) {
+            const copy = document.createElement('span');
+            const label = document.createElement('strong');
+            label.textContent = `Respondendo a ${respostaSelecionada.sender_name}: `;
+            copy.append(label, document.createTextNode(respostaSelecionada.body));
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'icon-button';
+            cancel.setAttribute('aria-label', 'Cancelar resposta');
+            cancel.innerHTML = '&times;';
+            cancel.addEventListener('click', cancelarResposta);
+            replyPreview.append(copy, cancel);
+        }
+        requestAnimationFrame(() => { thread.scrollTop = thread.scrollHeight; });
     });
 }
 
 async function carregarMensagens() {
-    if (!usuarioLogado?.accessToken) return;
+    const contactId = Number(contatoSelecionadoId);
+    if (!usuarioLogado?.accessToken || !Number.isSafeInteger(contactId) || contactId < 1) return;
     try {
-        const response = await fetch(`${API_URL}/api/messages`, { headers: cabecalhosAutenticados() });
-        if (!response.ok) throw new Error('Não foi possível carregar as mensagens.');
-        const carregadas = await response.json();
-        const mescladas = new Map([...carregadas, ...mensagens].map(item => [String(item.id), item]));
-        mensagens = [...mescladas.values()]
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-            .slice(-100);
-        renderizarMensagens();
+        const response = await fetch(`${API_URL}/api/messages?contactId=${contactId}`, { headers: cabecalhosAutenticados() });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Não foi possível carregar esta conversa.');
+        if (contactId !== Number(contatoSelecionadoId)) return;
+        const merged = new Map([...result, ...mensagens].map(message => [String(message.id), message]));
+        mensagens = [...merged.values()].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).slice(-300);
+        renderizarChat();
     } catch (error) {
-        document.querySelectorAll('.message-list').forEach(lista => { lista.textContent = error.message; });
+        const thread = document.getElementById(`lista-mensagens-${usuarioLogado.cargo === 'Diretor' ? 'diretor' : 'cozinha'}`);
+        if (thread) {
+            thread.replaceChildren();
+            thread.appendChild(criarEstadoChat('Conversa indisponível', error.message));
+        }
     }
 }
 
-async function enviarMensagem(event) {
+function adicionarMensagemLocal(message) {
+    if (!mensagens.some(existing => String(existing.id) === String(message.id))) {
+        mensagens.push(message);
+        mensagens.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        mensagens = mensagens.slice(-300);
+    }
+}
+
+function responderMensagem(messageId) {
+    respostaSelecionada = mensagens.find(message => String(message.id) === String(messageId)) || null;
+    renderizarChat();
+    document.getElementById(`mensagem-${usuarioLogado?.cargo === 'Diretor' ? 'diretor' : 'cozinha'}`)?.focus();
+}
+
+function cancelarResposta() {
+    respostaSelecionada = null;
+    renderizarChat();
+}
+
+async function enviarMensagem(event, view) {
     event.preventDefault();
-    const input = document.getElementById('mensagem-diretor');
+    const input = document.getElementById(`mensagem-${view}`);
     const body = input.value.trim();
-    if (!body) return;
+    const recipientUserId = Number(contatoSelecionadoId);
+    if (!body || !recipientUserId) return;
     const button = event.currentTarget.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
         const response = await fetch(`${API_URL}/api/messages`, {
             method: 'POST',
             headers: cabecalhosAutenticados({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ body })
+            body: JSON.stringify({ body, recipientUserId, replyToMessageId: respostaSelecionada?.id || null })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Não foi possível enviar a mensagem.');
-        mensagens = [...mensagens.filter(item => item.id !== result.id), result].slice(-100);
+        adicionarMensagemLocal({ ...result, is_mine: true });
         input.value = '';
-        renderizarMensagens();
+        respostaSelecionada = null;
+        renderizarChat();
     } catch (error) { alert(error.message); }
     finally { button.disabled = false; }
+}
+
+async function apagarMensagem(messageId, scope) {
+    const prompt = scope === 'everyone' ? 'Apagar esta mensagem para todos os participantes?' : 'Apagar esta mensagem apenas da sua conversa?';
+    if (!confirm(prompt)) return;
+    try {
+        const response = await fetch(`${API_URL}/api/messages/${messageId}?scope=${scope}`, {
+            method: 'DELETE',
+            headers: cabecalhosAutenticados()
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Não foi possível apagar a mensagem.');
+        mensagens = mensagens.filter(message => String(message.id) !== String(messageId));
+        renderizarChat();
+    } catch (error) { alert(error.message); }
+}
+
+function apagarParaMim(messageId) { apagarMensagem(messageId, 'me'); }
+function apagarParaTodos(messageId) { apagarMensagem(messageId, 'everyone'); }
+
+function atualizarDestinoCompartilhamento() {
+    const select = document.getElementById('destino-compartilhamento');
+    if (!select) return;
+    const previousValue = select.value;
+    select.replaceChildren();
+    contatosChat.filter(contact => Number(contact.id) !== Number(contatoSelecionadoId)).forEach(contact => {
+        const option = document.createElement('option');
+        option.value = contact.id;
+        option.textContent = `${nomeCompletoChat(contact)} · ${contact.cargo}${contact.online ? ' · online' : ''}`;
+        select.appendChild(option);
+    });
+    if ([...select.options].some(option => option.value === previousValue)) select.value = previousValue;
+}
+
+function prepararCompartilhamento(messageId) {
+    if (contatosChat.filter(contact => Number(contact.id) !== Number(contatoSelecionadoId)).length === 0) {
+        alert('Não há outro contato disponível para encaminhar esta mensagem.');
+        return;
+    }
+    mensagemParaCompartilharId = messageId;
+    atualizarDestinoCompartilhamento();
+    document.getElementById('compartilhar-mensagem-dialog')?.showModal();
+}
+
+async function compartilharMensagem() {
+    const recipientUserId = Number(document.getElementById('destino-compartilhamento')?.value);
+    if (!mensagemParaCompartilharId || !recipientUserId) return;
+    try {
+        const response = await fetch(`${API_URL}/api/messages/${mensagemParaCompartilharId}/forward`, {
+            method: 'POST',
+            headers: cabecalhosAutenticados({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ recipientUserId })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Não foi possível encaminhar a mensagem.');
+        document.getElementById('compartilhar-mensagem-dialog').close();
+        mensagemParaCompartilharId = null;
+        alert('Mensagem encaminhada.');
+    } catch (error) { alert(error.message); }
 }
 
 function mostrarNotificacaoAoVivo(notification) {
@@ -854,9 +1140,30 @@ async function conectarEventosEmTempoReal() {
         });
         source.addEventListener('message', event => {
             const message = JSON.parse(event.data);
-            if (!mensagens.some(item => item.id === message.id)) mensagens.push(message);
-            mensagens = mensagens.slice(-100);
-            renderizarMensagens();
+            const currentUserId = Number(usuarioLogado?.id);
+            const senderId = Number(message.sender_user_id);
+            const recipientId = Number(message.recipient_user_id);
+            const contactId = senderId === currentUserId ? recipientId : senderId;
+            if (contactId === Number(contatoSelecionadoId)) {
+                adicionarMensagemLocal(message);
+                naoLidasPorContato.delete(contactId);
+                renderizarChat();
+            } else if (senderId !== currentUserId) {
+                naoLidasPorContato.set(contactId, (naoLidasPorContato.get(contactId) || 0) + 1);
+                renderizarContatos();
+            }
+        });
+        source.addEventListener('presence', event => {
+            const presence = JSON.parse(event.data);
+            const onlineIds = new Set((presence.users || []).map(user => Number(user.id)));
+            contatosChat = contatosChat.map(contact => ({ ...contact, online: onlineIds.has(Number(contact.id)) }));
+            renderizarContatos();
+            renderizarChat();
+        });
+        source.addEventListener('message_deleted', event => {
+            const deletion = JSON.parse(event.data);
+            mensagens = mensagens.filter(message => String(message.id) !== String(deletion.id));
+            renderizarChat();
         });
         source.onerror = () => {
             source.close();

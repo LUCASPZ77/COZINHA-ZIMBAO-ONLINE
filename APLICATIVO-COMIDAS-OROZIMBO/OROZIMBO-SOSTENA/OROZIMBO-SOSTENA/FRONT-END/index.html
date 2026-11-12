@@ -135,7 +135,25 @@
                 <h3 id="titulo-mensagens-cozinha"><i class="fas fa-comment-dots"></i> Mensagens da Direção</h3>
                 <span class="realtime-status" data-realtime-status>Conectando...</span>
             </div>
-            <div id="lista-mensagens-cozinha" class="message-list" role="log" aria-live="polite"></div>
+            <div class="chat-workspace">
+                <aside class="chat-contacts-panel">
+                    <label class="sr-only" for="busca-contatos-cozinha">Buscar contato</label>
+                    <input id="busca-contatos-cozinha" class="chat-contact-search" type="search" placeholder="Buscar contato..." oninput="renderizarContatos()">
+                    <div id="lista-contatos-cozinha" class="chat-contacts" role="list" aria-label="Contatos"></div>
+                </aside>
+                <section class="chat-conversation" aria-label="Conversa">
+                    <header id="cabecalho-chat-cozinha" class="chat-conversation-header">
+                        <strong>Selecione um contato</strong>
+                    </header>
+                    <div id="lista-mensagens-cozinha" class="chat-thread" role="log" aria-live="polite"></div>
+                    <div id="resposta-chat-cozinha" class="chat-reply-preview hidden"></div>
+                    <form id="form-mensagem-cozinha" class="chat-composer" onsubmit="enviarMensagem(event, 'cozinha')">
+                        <label class="sr-only" for="mensagem-cozinha">Mensagem</label>
+                        <textarea id="mensagem-cozinha" maxlength="2000" rows="2" placeholder="Escreva uma mensagem..." required></textarea>
+                        <button type="submit" class="chat-send-button" aria-label="Enviar mensagem" title="Enviar mensagem"><i class="fas fa-paper-plane"></i></button>
+                    </form>
+                </section>
+            </div>
         </section>
     </div>
 
@@ -251,17 +269,30 @@
         <div id="aba-mensagens" class="tab-content hidden">
             <div class="communication-heading">
                 <div>
-                    <h3 class="section-title">Mensagens para a cozinha</h3>
-                    <p class="field-hint">As mensagens são entregues em tempo real para as cozinheiras.</p>
+                    <h3 class="section-title">Conversas</h3>
+                    <p class="field-hint">Contatos da equipe, com disponibilidade em tempo real.</p>
                 </div>
                 <span class="realtime-status" data-realtime-status>Conectando...</span>
             </div>
-            <form class="message-composer" onsubmit="enviarMensagem(event)">
-                <label for="mensagem-diretor">Nova mensagem</label>
-                <textarea id="mensagem-diretor" maxlength="2000" rows="3" placeholder="Escreva um recado para a equipe da cozinha..." required></textarea>
-                <button type="submit" class="button button--primary button--compact"><i class="fas fa-paper-plane"></i> Enviar mensagem</button>
-            </form>
-            <div id="lista-mensagens-diretor" class="message-list" role="log" aria-live="polite"></div>
+            <div class="chat-workspace">
+                <aside class="chat-contacts-panel">
+                    <label class="sr-only" for="busca-contatos-diretor">Buscar contato</label>
+                    <input id="busca-contatos-diretor" class="chat-contact-search" type="search" placeholder="Buscar contato..." oninput="renderizarContatos()">
+                    <div id="lista-contatos-diretor" class="chat-contacts" role="list" aria-label="Contatos"></div>
+                </aside>
+                <section class="chat-conversation" aria-label="Conversa">
+                    <header id="cabecalho-chat-diretor" class="chat-conversation-header">
+                        <strong>Selecione um contato</strong>
+                    </header>
+                    <div id="lista-mensagens-diretor" class="chat-thread" role="log" aria-live="polite"></div>
+                    <div id="resposta-chat-diretor" class="chat-reply-preview hidden"></div>
+                    <form id="form-mensagem-diretor" class="chat-composer" onsubmit="enviarMensagem(event, 'diretor')">
+                        <label class="sr-only" for="mensagem-diretor">Mensagem</label>
+                        <textarea id="mensagem-diretor" maxlength="2000" rows="2" placeholder="Escreva uma mensagem..." required></textarea>
+                        <button type="submit" class="chat-send-button" aria-label="Enviar mensagem" title="Enviar mensagem"><i class="fas fa-paper-plane"></i></button>
+                    </form>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -270,6 +301,20 @@
         <span><strong id="live-toast-title"></strong><small id="live-toast-detail"></small></span>
         <button type="button" onclick="dispensarNotificacaoAoVivo()" aria-label="Fechar aviso">&times;</button>
     </aside>
+
+    <dialog id="compartilhar-mensagem-dialog" class="chat-share-dialog" aria-labelledby="compartilhar-mensagem-titulo">
+        <form method="dialog" class="chat-share-dialog-header">
+            <h2 id="compartilhar-mensagem-titulo">Compartilhar mensagem</h2>
+            <button type="submit" class="icon-button" aria-label="Fechar">&times;</button>
+        </form>
+        <p>Escolha para quem encaminhar esta mensagem.</p>
+        <label for="destino-compartilhamento">Contato</label>
+        <select id="destino-compartilhamento"></select>
+        <div class="chat-share-actions">
+            <button type="button" class="button button--secondary button--compact" onclick="document.getElementById('compartilhar-mensagem-dialog').close()">Cancelar</button>
+            <button type="button" class="button button--primary button--compact" onclick="compartilharMensagem()"><i class="fas fa-share"></i> Encaminhar</button>
+        </div>
+    </dialog>
 
     <div id="loading" class="hidden" role="status" aria-live="polite" aria-busy="true">
         <div class="loading-wrap">
