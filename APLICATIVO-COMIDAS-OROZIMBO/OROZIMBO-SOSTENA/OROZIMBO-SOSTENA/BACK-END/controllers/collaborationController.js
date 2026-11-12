@@ -9,6 +9,7 @@ import {
   hideMessageForUser,
   listChatContacts,
   markAllNotificationsRead,
+  removeNotification,
 } from '../models/collaborationModel.js';
 import { consumeSseTicket, getOnlineUsers, issueSseTicket, publishToRole, publishToUser, subscribeToEvents } from '../services/realtimeHub.js';
 
@@ -40,13 +41,19 @@ export async function markNotificationsReadController(req, res, next) {
 
 export async function listMessagesController(req, res, next) {
   const contactId = Number(req.query.contactId);
+  const beforeId = req.query.before ? Number(req.query.before) : null;
   if (!Number.isSafeInteger(contactId) || contactId < 1 || contactId === req.user.id) {
     return res.status(400).json({ error: 'Selecione um contato válido.' });
+  }
+  if (beforeId !== null && (!Number.isSafeInteger(beforeId) || beforeId < 1)) {
+    return res.status(400).json({ error: 'Cursor de mensagens inválido.' });
   }
   try {
     const contact = await getChatContact(req.user.id, contactId);
     if (!contact) return res.status(404).json({ error: 'Contato não encontrado.' });
-    res.json(await getConversationMessages(req.user.id, contactId));
+    const page = await getConversationMessages(req.user.id, contactId, beforeId);
+    const hasMore = page.length > 50;
+    res.json({ messages: hasMore ? page.slice(1) : page, hasMore });
   } catch (error) { next(error); }
 }
 
@@ -180,4 +187,14 @@ export function eventStreamController(req, res) {
     clearInterval(heartbeat);
     unsubscribe();
   });
+}
+
+export async function deleteNotificationController(req, res, next) {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: 'Notificação inválida.' });
+  try {
+    const removed = await removeNotification(id);
+    if (!removed) return res.status(404).json({ error: 'Notificação não encontrada.' });
+    res.json({ message: 'Notificação apagada.' });
+  } catch (error) { next(error); }
 }

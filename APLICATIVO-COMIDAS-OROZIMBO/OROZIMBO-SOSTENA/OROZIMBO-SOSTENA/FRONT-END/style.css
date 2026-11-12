@@ -522,9 +522,27 @@ input:focus, select:focus {
 }
 
 .notification-item-content { display: grid; gap: 5px; }
+.notification-item-content { min-width: 0; flex: 1; }
 .notification-item-content strong { color: var(--text); font-size: 0.9rem; }
 .notification-item-content small,
 .message-item time { color: var(--muted); font-size: 0.75rem; }
+
+.notification-delete-button {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    place-items: center;
+    align-self: center;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.notification-delete-button:hover { background: #fee2e2; color: #b91c1c; }
+.notification-delete-button:focus-visible { outline: 3px solid rgba(15, 118, 110, 0.35); outline-offset: 2px; }
 
 .message-composer {
     display: grid;
@@ -693,6 +711,20 @@ input:focus, select:focus {
 .chat-empty-state i { color: #8ca4b0; font-size: 1.8rem; }
 .chat-empty-state strong { color: #334155; font-size: 0.92rem; }
 .chat-empty-state span { max-width: 260px; font-size: 0.8rem; }
+
+.chat-load-older {
+    align-self: center;
+    padding: 8px 12px;
+    border: 1px solid #d5e0e6;
+    border-radius: 999px;
+    background: #fff;
+    color: #42606d;
+    font-size: 0.76rem;
+    cursor: pointer;
+}
+
+.chat-load-older:hover { border-color: #9cc9bd; color: #0f766e; }
+.chat-load-older:disabled { opacity: 0.65; cursor: wait; }
 
 .chat-message {
     display: grid;

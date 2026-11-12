@@ -16,7 +16,20 @@ export const createConsumoLogTable = async () => {
       periodo TEXT,
       timestamp TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS consumo_log_data_idx ON consumo_log (data);
   `);
+};
+
+export const deleteExpiredConsumptionLogs = async () => {
+  const result = await pool.query(
+    `DELETE FROM consumo_log
+     WHERE tipo = 'SAIDA'
+       AND CASE
+       WHEN data ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN data::date <= CURRENT_DATE - 30
+       ELSE FALSE
+     END`
+  );
+  return result.rowCount;
 };
 
 export const getAllLogs = async () => {

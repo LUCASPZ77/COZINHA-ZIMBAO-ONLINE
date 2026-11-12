@@ -32,6 +32,8 @@ export async function createCollaborationTables() {
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_for_all_at TIMESTAMPTZ;
     CREATE INDEX IF NOT EXISTS messages_created_at_idx ON messages (created_at DESC);
     CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (sender_user_id, recipient_user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS messages_sender_recipient_page_idx ON messages (sender_user_id, recipient_user_id, id DESC);
+    CREATE INDEX IF NOT EXISTS messages_recipient_sender_page_idx ON messages (recipient_user_id, sender_user_id, id DESC);
 
     CREATE TABLE IF NOT EXISTS message_hidden_for_user (
       user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -60,6 +62,16 @@ export async function markAllNotificationsRead() {
   await pool.query('UPDATE notifications SET read_at = NOW() WHERE read_at IS NULL');
 }
 
+export async function removeNotification(id) {
+  const result = await pool.query('DELETE FROM notifications WHERE id = $1 RETURNING id', [id]);
+  return result.rows[0];
+}
+
+export async function deleteExpiredNotifications() {
+  const result = await pool.query("DELETE FROM notifications WHERE event_type = 'baixa' AND created_at <= NOW() - INTERVAL '30 days'");
+  return result.rowCount;
+}
+
 export async function listChatContacts(userId) {
   const result = await pool.query(
     `SELECT id, nome, sobrenome, cargo
@@ -86,7 +98,7 @@ export async function getMessageById(id) {
   return result.rows[0];
 }
 
-export async function getConversationMessages(userId, contactId) {
+export async function getConversationMessages(userId, contactId, beforeId = null, pageSize = 51) {
   const result = await pool.query(
     `SELECT m.*, m.sender_user_id = $1 AS is_mine,
             reply.sender_name AS reply_sender_name,
@@ -101,16 +113,17 @@ export async function getConversationMessages(userId, contactId) {
        OR (m.sender_user_id = $2 AND m.recipient_user_id = $1)
       OR (m.recipient_user_id IS NULL AND m.recipient_role = 'Cozinheira' AND m.sender_user_id IN ($1, $2))
      )
+       AND ($3::bigint IS NULL OR m.id < $3)
        AND m.deleted_for_all_at IS NULL
        AND NOT EXISTS (
          SELECT 1 FROM message_hidden_for_user hidden
          WHERE hidden.message_id = m.id AND hidden.user_id = $1
        )
-     ORDER BY m.created_at ASC, m.id ASC
-     LIMIT 300`,
-    [userId, contactId]
+     ORDER BY m.id DESC
+     LIMIT $4`,
+    [userId, contactId, beforeId, pageSize]
   );
-  return result.rows;
+  return result.rows.reverse();
 }
 
 export async function createMessage({ senderUserId, senderName, recipientUserId, recipientRole, body, replyToMessageId, forwardedFromId }) {

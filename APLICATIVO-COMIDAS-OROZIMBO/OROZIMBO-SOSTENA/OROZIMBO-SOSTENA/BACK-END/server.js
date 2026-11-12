@@ -14,13 +14,14 @@ import { errorHandler } from './middlewares/errorHandler.js';
 
 import { createUserTable } from './models/userModel.js';
 import { createStockTable } from './models/stockModel.js';
-import { createConsumoLogTable } from './models/consumoLogModel.js';
-import { createCollaborationTables } from './models/collaborationModel.js';
+import { createConsumoLogTable, deleteExpiredConsumptionLogs } from './models/consumoLogModel.js';
+import { createCollaborationTables, deleteExpiredNotifications } from './models/collaborationModel.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pastaFrontEnd = join(__dirname, '..', 'FRONT-END');
 
 const app = express();
+const DAILY_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 app.use(express.json());
 app.use(cors());
@@ -57,10 +58,27 @@ async function initDb() {
     await createStockTable();
     await createConsumoLogTable();
     await createCollaborationTables();
+    await cleanupExpiredRecords();
+    const cleanupTimer = setInterval(cleanupExpiredRecords, DAILY_CLEANUP_INTERVAL_MS);
+    cleanupTimer.unref();
     console.log('Banco e tabelas inicializados');
   } catch (e) {
     console.error('Erro ao inicializar tabelas:', e);
     throw e;
+  }
+}
+
+async function cleanupExpiredRecords() {
+  try {
+    const [reportsDeleted, notificationsDeleted] = await Promise.all([
+      deleteExpiredConsumptionLogs(),
+      deleteExpiredNotifications(),
+    ]);
+    if (reportsDeleted || notificationsDeleted) {
+      console.log(`Retenção de 30 dias: ${reportsDeleted} relatórios e ${notificationsDeleted} notificações removidos`);
+    }
+  } catch (error) {
+    console.error('Falha ao limpar registros com mais de 30 dias:', error.message);
   }
 }
 

@@ -11,6 +11,8 @@ let contatoSelecionadoId = null;
 let respostaSelecionada = null;
 let mensagemParaCompartilharId = null;
 let naoLidasPorContato = new Map();
+let hasMoreMessages = false;
+let loadingOlderMessages = false;
 let toastTimer = null;
 
 const SOM_NOTIFICACAO = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -738,9 +740,29 @@ function renderizarNotificacoes() {
         const details = document.createElement('small');
         details.textContent = `${item.actor_name} · ${formatarDataHora(item.created_at)}`;
         content.append(message, details);
-        row.append(icon, content);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'notification-delete-button';
+        remove.setAttribute('aria-label', `Apagar notificação de ${item.actor_name}`);
+        remove.title = 'Apagar notificação';
+        remove.innerHTML = '<i class="fas fa-trash" aria-hidden="true"></i>';
+        remove.addEventListener('click', () => apagarNotificacao(item.id));
+        row.append(icon, content, remove);
         lista.appendChild(row);
     });
+}
+
+async function apagarNotificacao(id) {
+    try {
+        const response = await fetch(`${API_URL}/api/notifications/${id}`, {
+            method: 'DELETE',
+            headers: cabecalhosAutenticados()
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Não foi possível apagar a notificação.');
+        notificacoes = notificacoes.filter(item => String(item.id) !== String(id));
+        renderizarNotificacoes();
+    } catch (error) { alert(error.message); }
 }
 
 async function marcarNotificacoesComoLidas() {
@@ -776,6 +798,7 @@ async function carregarContatos() {
             contatoSelecionadoId = contatosChat[0]?.id || null;
             mensagens = [];
             respostaSelecionada = null;
+            hasMoreMessages = false;
         }
         renderizarChat();
         if (contatoSelecionadoId) await carregarMensagens();
@@ -792,7 +815,8 @@ async function carregarContatos() {
 
 function renderizarContatos() {
     const ordered = [...contatosChat].sort((a, b) => Number(b.online) - Number(a.online) || nomeCompletoChat(a).localeCompare(nomeCompletoChat(b), 'pt-BR'));
-    ['diretor', 'cozinha'].forEach(view => {
+    const activeView = usuarioLogado?.cargo === 'Diretor' ? 'diretor' : 'cozinha';
+    [activeView].forEach(view => {
         const list = document.getElementById(`lista-contatos-${view}`);
         if (!list) return;
         const search = document.getElementById(`busca-contatos-${view}`)?.value.trim().toLocaleLowerCase('pt-BR') || '';
@@ -838,6 +862,8 @@ async function selecionarContato(contactId) {
     contatoSelecionadoId = Number(contactId);
     mensagens = [];
     respostaSelecionada = null;
+    hasMoreMessages = false;
+    loadingOlderMessages = false;
     naoLidasPorContato.delete(contatoSelecionadoId);
     renderizarContatos();
     renderizarChat();
@@ -926,9 +952,10 @@ function criarElementoMensagem(message) {
     return row;
 }
 
-function renderizarChat() {
+function renderizarChat({ scrollToBottom = true, previousScroll = null } = {}) {
     const contact = contatoSelecionado();
-    ['diretor', 'cozinha'].forEach(view => {
+    const activeView = usuarioLogado?.cargo === 'Diretor' ? 'diretor' : 'cozinha';
+    [activeView].forEach(view => {
         const header = document.getElementById(`cabecalho-chat-${view}`);
         const thread = document.getElementById(`lista-mensagens-${view}`);
         const textarea = document.getElementById(`mensagem-${view}`);
@@ -957,7 +984,18 @@ function renderizarChat() {
         thread.replaceChildren();
         if (!contact) thread.appendChild(criarEstadoChat('Suas conversas', 'Escolha um contato para começar uma conversa individual.'));
         else if (mensagens.length === 0) thread.appendChild(criarEstadoChat('Início da conversa', 'Envie uma mensagem para iniciar este diálogo.'));
-        else mensagens.forEach(message => thread.appendChild(criarElementoMensagem(message)));
+        else {
+            if (hasMoreMessages) {
+                const olderButton = document.createElement('button');
+                olderButton.type = 'button';
+                olderButton.className = 'chat-load-older';
+                olderButton.textContent = loadingOlderMessages ? 'Carregando...' : 'Carregar mensagens anteriores';
+                olderButton.disabled = loadingOlderMessages;
+                olderButton.addEventListener('click', () => carregarMensagens({ older: true }));
+                thread.appendChild(olderButton);
+            }
+            mensagens.forEach(message => thread.appendChild(criarElementoMensagem(message)));
+        }
 
         textarea.disabled = !contact;
         textarea.placeholder = contact ? `Mensagem para ${contact.nome}...` : 'Selecione um contato para enviar mensagens';
@@ -977,27 +1015,38 @@ function renderizarChat() {
             cancel.addEventListener('click', cancelarResposta);
             replyPreview.append(copy, cancel);
         }
-        requestAnimationFrame(() => { thread.scrollTop = thread.scrollHeight; });
+        requestAnimationFrame(() => {
+            if (previousScroll) thread.scrollTop = previousScroll.top + thread.scrollHeight - previousScroll.height;
+            else if (scrollToBottom) thread.scrollTop = thread.scrollHeight;
+        });
     });
 }
 
-async function carregarMensagens() {
+async function carregarMensagens({ older = false } = {}) {
     const contactId = Number(contatoSelecionadoId);
     if (!usuarioLogado?.accessToken || !Number.isSafeInteger(contactId) || contactId < 1) return;
+    const view = usuarioLogado.cargo === 'Diretor' ? 'diretor' : 'cozinha';
+    const thread = document.getElementById(`lista-mensagens-${view}`);
+    const previousScroll = older && thread ? { top: thread.scrollTop, height: thread.scrollHeight } : null;
+    if (older) loadingOlderMessages = true;
+    renderizarChat({ scrollToBottom: !older, previousScroll });
     try {
-        const response = await fetch(`${API_URL}/api/messages?contactId=${contactId}`, { headers: cabecalhosAutenticados() });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Não foi possível carregar esta conversa.');
+        const before = older ? mensagens[0]?.id : null;
+        const query = new URLSearchParams({ contactId: String(contactId) });
+        if (before) query.set('before', String(before));
+        const response = await fetch(`${API_URL}/api/messages?${query}`, { headers: cabecalhosAutenticados() });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Não foi possível carregar esta conversa.');
         if (contactId !== Number(contatoSelecionadoId)) return;
-        const merged = new Map([...result, ...mensagens].map(message => [String(message.id), message]));
-        mensagens = [...merged.values()].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).slice(-300);
-        renderizarChat();
+        const page = Array.isArray(payload) ? payload : (payload.messages || []);
+        hasMoreMessages = Array.isArray(payload) ? false : Boolean(payload.hasMore);
+        const merged = new Map([...(older ? page : []), ...mensagens, ...(older ? [] : page)].map(message => [String(message.id), message]));
+        mensagens = [...merged.values()].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        loadingOlderMessages = false;
+        renderizarChat({ scrollToBottom: !older, previousScroll });
     } catch (error) {
-        const thread = document.getElementById(`lista-mensagens-${usuarioLogado.cargo === 'Diretor' ? 'diretor' : 'cozinha'}`);
-        if (thread) {
-            thread.replaceChildren();
-            thread.appendChild(criarEstadoChat('Conversa indisponível', error.message));
-        }
+        loadingOlderMessages = false;
+        if (thread) { thread.replaceChildren(); thread.appendChild(criarEstadoChat('Conversa indisponível', error.message)); }
     }
 }
 
